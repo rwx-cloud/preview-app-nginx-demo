@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MinIO presigned URL demo</title>
+    <link rel="stylesheet" href="/styles.css?v=2" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>MinIO presigned URL demo</h1>
+        <p>
+          Nginx serves this page and routes requests to the API and MinIO. Both use the same public URL and RWX app
+          lifecycle.
+        </p>
+      </header>
+
+      <p class="flow"><strong>Request path:</strong> <code>browser → nginx → api → minio</code></p>
+
+      <button id="load-object" type="button">Fetch demo object</button>
+
+      <section class="result" aria-live="polite">
+        <div>
+          <h2>1. API response</h2>
+          <pre id="api-response">No request yet.</pre>
+        </div>
+        <div>
+          <h2>2. MinIO object</h2>
+          <pre id="object-response">No object fetched yet.</pre>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

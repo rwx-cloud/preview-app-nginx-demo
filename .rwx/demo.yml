@@ -1,0 +1,74 @@
+on:
+  cli:
+    init:
+      commit-sha: ${{ event.git.sha }}
+
+base:
+  image: ubuntu:24.04
+  config: rwx/base 1.1.1
+
+tasks:
+  - key: code
+    call: git/clone 2.0.8
+    with:
+      repository: https://github.com/rwx-cloud/preview-app-nginx-demo.git
+      ref: ${{ init.commit-sha }}
+      github-token: ${{ github.token }}
+
+  - key: node
+    call: nodejs/install 1.1.15
+    with:
+      node-version: 22.12.0
+
+  - key: api-dependencies
+    use: [code, node]
+    run: npm ci --prefix api --omit=dev
+
+  - key: nginx
+    run: |
+      sudo apt-get update
+      sudo apt-get install --yes nginx
+      sudo apt-get clean
+
+  - key: minio
+    run: |
+      curl --fail --location \
+        --output minio \
+        https://dl.min.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2025-09-07T16-13-09Z
+      echo "7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f minio" | sha256sum --check
+      sudo install --mode 0755 minio /usr/local/bin/minio
+
+  - key: preview
+    use: [api-dependencies, nginx, minio]
+    app:
+      endpoint: nginx-minio-demo
+      port: 8080
+    env:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ENDPOINT: http://127.0.0.1:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      S3_BUCKET: demo-bucket
+      S3_OBJECT_KEY: hello.json
+    background-processes:
+      - key: minio
+        run: |
+          mkdir -p /tmp/minio-data
+          minio server /tmp/minio-data \
+            --address 127.0.0.1:9000 \
+            --console-address 127.0.0.1:9001
+        ready-check:
+          run: curl --fail http://127.0.0.1:9000/minio/health/live
+          timeout-seconds: 60
+
+      - key: api
+        after: [minio]
+        run: npm --prefix api start
+        ready-check:
+          run: curl --fail http://127.0.0.1:3000/health
+          timeout-seconds: 60
+
+    run: |
+      sudo cp -r ui/. /usr/share/nginx/html/
+      sudo nginx -c "$PWD/nginx.conf" -g "daemon off;"
